@@ -154,6 +154,12 @@ td small{display:block;color:var(--muted);font-size:12px}
 .acts{display:flex;gap:6px;justify-content:flex-end}
 .acts button{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);padding:5px 8px;cursor:pointer}
 .acts button.del.armed{background:#c2410c;border-color:#c2410c;color:#fff}
+.rr .inf{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13px;color:var(--muted);padding-top:2px}
+.rr .inf b{color:var(--fg);font-weight:600;overflow-wrap:anywhere}
+.rr .inf button{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);padding:4px 9px;cursor:pointer}
+.rr .inf button.pri{border-color:var(--orange);background:var(--orange-soft)}
+.rr .inf button.armed{background:#c2410c;border-color:#c2410c;color:#fff}
+.rr .inf .pdfi{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:#c2410c;border-radius:4px;padding:1px 5px}
 .empty{padding:28px 12px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
 @media (max-width:900px){
   .rr.hd{display:none}
@@ -327,10 +333,11 @@ footer a{color:var(--navy)}
         <button type="button" class="btn3" id="regBak">Hacer respaldo</button>
         <label class="btn3" for="regImp" style="font-weight:600">Importar respaldo</label>
         <input type="file" id="regImp" accept=".json,application/json" hidden>
+        <input type="file" id="infFile" accept="application/pdf,.pdf" hidden>
       </div>
       <div id="regMsg" class="hint" aria-live="polite"></div>
       <div class="reg" id="reg"></div>
-      <p class="hint" style="margin:0">Cada propuesta se agrega sola al descargarla en Word o PDF. El saldo se calcula como total menos abono; al poner la fecha de cancelación queda en cero. El control se guarda en este equipo: usa <b>Hacer respaldo</b> e <b>Importar respaldo</b> para pasarlo entre el iPhone y la computadora.</p>
+      <p class="hint" style="margin:0">Cada propuesta se agrega sola al descargarla en Word o PDF. El saldo se calcula como total menos abono; al poner la fecha de cancelación queda en cero. El control se guarda en este equipo: usa <b>Hacer respaldo</b> e <b>Importar respaldo</b> para pasarlo entre el iPhone y la computadora. El respaldo incluye los informes PDF adjuntos.</p>
     </div>
   </section>
 
@@ -1133,7 +1140,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.18-3";
+const APP_VERSION="2026.10.18-4";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
@@ -1202,6 +1209,16 @@ $("f").addEventListener("submit",e=>e.preventDefault());
 const REG_KEY="sbreg1";
 let REG=[];
 try{REG=JSON.parse(localStorage.getItem(REG_KEY)||"[]");if(!Array.isArray(REG))REG=[]}catch(e){REG=[]}
+const nuevoId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+REG.forEach(r=>{if(!r.id)r.id=nuevoId()});
+// Informes PDF: se guardan en la base de datos del navegador (IndexedDB), uno por propuesta
+const IDB={_db:null,
+  open(){if(this._db)return Promise.resolve(this._db);return new Promise((ok,ko)=>{const q=indexedDB.open("sbinformes",1);q.onupgradeneeded=()=>q.result.createObjectStore("pdf");q.onsuccess=()=>{this._db=q.result;ok(this._db)};q.onerror=()=>ko(q.error)})},
+  async tx(mode,fn){const db=await this.open();return new Promise((ok,ko)=>{const t=db.transaction("pdf",mode);const st=t.objectStore("pdf");const r=fn(st);t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>ko(t.error);t.onabort=()=>ko(t.error)})},
+  put(id,blob){return this.tx("readwrite",st=>st.put(blob,id))},
+  get(id){return this.tx("readonly",st=>st.get(id))},
+  del(id){return this.tx("readwrite",st=>st.delete(id))}};
+const tam=b=>b>=1048576?(b/1048576).toFixed(1)+" MB":Math.max(1,Math.round(b/1024))+" KB";
 function regSave(){try{localStorage.setItem(REG_KEY,JSON.stringify(REG))}catch(e){$("regMsg").textContent="No se pudo guardar en este equipo (memoria llena o bloqueada). Haz un respaldo."}}
 // Numeración consecutiva de la app (una sola serie para todas las propuestas)
 const pad3=n=>String(n).padStart(3,"0");
@@ -1218,7 +1235,7 @@ function registrar(s,q){
   if(editingRef&&editingRef!==ref){const old=REG.find(x=>x.ref===editingRef);if(old&&!REG.some(x=>x.ref===ref))old.ref=ref}
   let r=REG.find(x=>x.ref===ref);
   const base={ref,cliente:s.cliente,lugar:s.lugar,tipoN:q.t.n,nivel:q.n+1,area:q.area,fechaProp:s.fecha,total:q.total,s,actualizado:now};
-  if(r)Object.assign(r,base);else{r={...base,estado:"Pendiente",fInsp:"",nInsp:"",abono:"",fCanc:"",creado:now};REG.unshift(r)}
+  if(r)Object.assign(r,base);else{r={...base,id:nuevoId(),estado:"Pendiente",fInsp:"",nInsp:"",abono:"",fCanc:"",creado:now};REG.unshift(r)}
   editingRef=ref;
   regSave();renderReg();calc();
   return r;
@@ -1247,6 +1264,7 @@ function renderReg(){
     <div><span class="cl">Saldo</span>${r.fCanc?`<span class="chip">Pagado</span>`:`<span class="m">${money(sd)}</span>`}</div>
     <div><span class="cl">Fecha cancelación</span><input type="date" data-k="fCanc" value="${esc(r.fCanc||"")}" aria-label="Fecha de cancelación de ${i}"></div>
     <div class="acts span2"><button type="button" data-a="abrir">Abrir</button><button type="button" class="del" data-a="del">Eliminar</button></div>
+    <div class="inf">${r.informe?`<span class="pdfi">PDF</span><span>Informe: <b>${esc(r.informe.name)}</b> · ${tam(r.informe.size)} · ${esc(fechaCorta(r.informe.fecha))}</span><button type="button" class="pri" data-a="verinf">Ver / Enviar</button><button type="button" data-a="adj">Cambiar</button><button type="button" data-a="quitinf">Quitar</button>`:`<span>Informe técnico: sin adjuntar</span><button type="button" class="pri" data-a="adj">Adjuntar informe (PDF)</button>`}</div>
   </div>`}).join("");
 }
 $("reg").addEventListener("change",e=>{
@@ -1260,11 +1278,36 @@ $("reg").addEventListener("click",e=>{
   const row=b.closest(".rr[data-ref]"),r=REG.find(x=>x.ref===row.dataset.ref);if(!r)return;
   if(b.dataset.a==="del"){
     if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="¿Seguro?";setTimeout(()=>{if(b.isConnected){b.classList.remove("armed");b.textContent="Eliminar"}},4000);return}
-    REG=REG.filter(x=>x!==r);if(editingRef===r.ref)editingRef="";regSave();renderReg();$("regMsg").textContent=`Se eliminó la propuesta ${r.ref}.`;return;
+    REG=REG.filter(x=>x!==r);if(r.informe)IDB.del(r.id).catch(()=>{});if(editingRef===r.ref)editingRef="";regSave();renderReg();$("regMsg").textContent=`Se eliminó la propuesta ${r.ref}.`;return;
+  }
+  if(b.dataset.a==="adj"){infPara=r.id;$("infFile").click();return}
+  if(b.dataset.a==="verinf"){verInforme(r);return}
+  if(b.dataset.a==="quitinf"){
+    if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="¿Quitar?";setTimeout(()=>{if(b.isConnected){b.classList.remove("armed");b.textContent="Quitar"}},4000);return}
+    IDB.del(r.id).catch(()=>{});delete r.informe;r.actualizado=new Date().toISOString();regSave();renderReg();$("regMsg").textContent=`Se quitó el informe de ${r.ref}.`;return;
   }
   if(b.dataset.a==="abrir"&&r.s){cargarEstado(r.s);editingRef=r.ref;const mi=/^PE-INS-(.+)-\d+$/.exec(r.ref);$("iniciales").value=mi?mi[1]:"";iniTouched=true;calc();mostrarTab("nueva");window.scrollTo({top:0,behavior:"smooth"})}
 });
 $("regQ").addEventListener("input",renderReg);
+let infPara=null;
+$("infFile").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value="";const r=REG.find(x=>x.id===infPara);infPara=null;if(!f||!r)return;
+  if(!/pdf$/i.test(f.type)&&!/\.pdf$/i.test(f.name)){$("regMsg").textContent="El informe debe ser un archivo PDF.";return}
+  try{
+    await IDB.put(r.id,new Blob([await f.arrayBuffer()],{type:"application/pdf"}));
+    r.informe={name:f.name,size:f.size,fecha:hoyISO()};r.actualizado=new Date().toISOString();regSave();renderReg();
+    $("regMsg").textContent=`Informe adjuntado a ${r.ref}: ${f.name} (${tam(f.size)}).`;
+  }catch(err){$("regMsg").textContent="No se pudo guardar el informe en este equipo (falta espacio o el navegador lo bloqueó)."}
+});
+async function verInforme(r){
+  try{
+    const blob=await IDB.get(r.id);
+    if(!blob){$("regMsg").textContent="Este informe no está guardado en este equipo. Impórtalo con un respaldo que lo incluya o adjúntalo de nuevo.";return}
+    const movil=/Android|iPhone|iPad/i.test(navigator.userAgent);
+    if(!downloads&&!movil){const u=URL.createObjectURL(blob);const w=window.open(u,"_blank");setTimeout(()=>URL.revokeObjectURL(u),60000);if(w)return}
+    $("regMsg").textContent=await entregar(blob,r.informe.name||`Informe_${r.ref}.pdf`);
+  }catch(e){$("regMsg").textContent=msgError(e)}
+}
 $("seqNext").addEventListener("change",()=>{
   let mx=0;for(const r of REG){const n=numDe(r.ref);if(n>mx)mx=n}
   let v=parseInt($("seqNext").value,10)||1;
@@ -1275,13 +1318,16 @@ $("seqNext").addEventListener("change",()=>{
 function csvCell(v){v=v==null?"":String(v);return /[",\n;]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}
 $("regCsv").addEventListener("click",async()=>{
   if(!REG.length){$("regMsg").textContent="No hay propuestas para exportar.";return}
-  const head=["Nº propuesta","Fecha propuesta","Cliente","Lugar","Tipo de estructura","Nivel","Estado","Fecha inspección","Nº inspección","Total (B/.)","Abono (B/.)","Saldo (B/.)","Fecha cancelación"];
-  const lines=[head,...REG.map(r=>[r.ref,fechaCorta(r.fechaProp),r.cliente,r.lugar,r.tipoN,r.nivel,r.estado,fechaCorta(r.fInsp),r.nInsp,r2m(r.total).toFixed(2),r.abono===""?"":r2m(r.abono).toFixed(2),saldoDe(r).toFixed(2),fechaCorta(r.fCanc)])].map(a=>a.map(csvCell).join(","));
+  const head=["Nº propuesta","Fecha propuesta","Cliente","Lugar","Tipo de estructura","Nivel","Estado","Fecha inspección","Nº inspección","Total (B/.)","Abono (B/.)","Saldo (B/.)","Fecha cancelación","Informe adjunto"];
+  const lines=[head,...REG.map(r=>[r.ref,fechaCorta(r.fechaProp),r.cliente,r.lugar,r.tipoN,r.nivel,r.estado,fechaCorta(r.fInsp),r.nInsp,r2m(r.total).toFixed(2),r.abono===""?"":r2m(r.abono).toFixed(2),saldoDe(r).toFixed(2),fechaCorta(r.fCanc),r.informe?r.informe.name:"No"])].map(a=>a.map(csvCell).join(","));
   const blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv"});
   try{$("regMsg").textContent=await entregar(blob,`Control_Propuestas_SB_${hoyISO().replace(/-/g,"").slice(2)}.csv`)}catch(e){$("regMsg").textContent=msgError(e)}
 });
 $("regBak").addEventListener("click",async()=>{
-  const blob=new Blob([JSON.stringify({app:"sb-propuestas",version:1,exportado:new Date().toISOString(),registro:REG},null,1)],{type:"application/json"});
+  $("regMsg").textContent="Preparando el respaldo…";
+  const informes={};
+  for(const r of REG){if(!r.informe)continue;try{const b=await IDB.get(r.id);if(b)informes[r.id]=await new Promise((ok,ko)=>{const fr=new FileReader();fr.onload=()=>ok(String(fr.result).split(",")[1]);fr.onerror=()=>ko(fr.error);fr.readAsDataURL(b)})}catch(e){}}
+  const blob=new Blob([JSON.stringify({app:"sb-propuestas",version:2,exportado:new Date().toISOString(),registro:REG,informes})],{type:"application/json"});
   try{$("regMsg").textContent=await entregar(blob,`Respaldo_Propuestas_SB_${hoyISO().replace(/-/g,"").slice(2)}.json`)}catch(e){$("regMsg").textContent=msgError(e)}
 });
 $("regImp").addEventListener("change",async e=>{
@@ -1289,11 +1335,13 @@ $("regImp").addEventListener("change",async e=>{
   try{
     const d=JSON.parse(await f.text());const arr=Array.isArray(d)?d:d&&Array.isArray(d.registro)?d.registro:null;
     if(!arr)throw new Error("el archivo no es un respaldo de esta app");
-    let nuevos=0,act=0;
-    for(const x of arr){if(!x||!x.ref)continue;const cur=REG.find(r=>r.ref===x.ref);
-      if(!cur){REG.push(x);nuevos++}else if((x.actualizado||"")>(cur.actualizado||"")){Object.assign(cur,x);act++}}
+    let nuevos=0,act=0,pdfs=0;const inf=(d&&d.informes)||{};
+    for(const x of arr){if(!x||!x.ref)continue;if(!x.id)x.id=nuevoId();const cur=REG.find(r=>r.ref===x.ref);
+      let destino=null;
+      if(!cur){REG.push(x);nuevos++;destino=x}else if((x.actualizado||"")>(cur.actualizado||"")){const keepId=cur.id;Object.assign(cur,x);cur.id=keepId;act++;destino=cur}
+      if(destino&&x.informe&&inf[x.id]){try{const bin=atob(inf[x.id]),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);await IDB.put(destino.id,new Blob([u],{type:"application/pdf"}));pdfs++}catch(e){}}}
     REG.sort((a,b)=>(b.creado||"").localeCompare(a.creado||""));regSave();renderReg();calc();
-    $("regMsg").textContent=`Respaldo importado: ${nuevos} propuesta(s) nueva(s) y ${act} actualizada(s).`;
+    $("regMsg").textContent=`Respaldo importado: ${nuevos} propuesta(s) nueva(s), ${act} actualizada(s)${pdfs?` y ${pdfs} informe(s) PDF`:""}.`;
   }catch(err){$("regMsg").textContent="No se pudo importar: "+(err.message||"archivo no válido")+"."}
 });
 function cargarEstado(d){
