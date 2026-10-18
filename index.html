@@ -906,7 +906,16 @@ function propuesta(s, q) {
 
   B.push({ t: "h", num: "04.", text: "HONORARIOS PROFESIONALES" });
   B.push({ t: "p", text: "La propuesta económica por los servicios descritos se detalla a continuación:" });
-  B.push({ t: "fees", lines: q.lines.map(l => [l.desc, money(l.v)]), sub: money(q.sub), itbms: money(q.itbms), total: money(q.total) });
+  // En la propuesta: una sola línea con la inspección; los cargos adicionales se mencionan como incluidos, sin desglose
+  const incl = [];
+  if (s.km * s.tkm) incl.push("transporte");
+  if (s.alimD * s.alimR) incl.push("alimentación");
+  if (s.aloj) incl.push("hospedaje");
+  if (s.topoC || s.topoO) incl.push("control topográfico de verticalidad y nivelación");
+  if (s.cil) incl.push("muestreo y ensayo de cilindros de concreto");
+  if (s.refuerzo) incl.push("diseño de reforzamiento");
+  const inclTxt = incl.length ? ". Incluye " + (incl.length > 1 ? incl.slice(0, -1).join(", ") + " y " + incl.at(-1) : incl[0]) : "";
+  B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)]], sub: money(q.sub), itbms: money(q.itbms), total: money(q.total) });
   B.push({ t: "p", text: `*  Los montos corresponden a una (1) edificación de hasta ${A} m². Edificaciones de área superior requerirán ajuste de honorarios previo acuerdo por escrito.`, before: true });
 
   B.push({ t: "h", num: "05.", text: "CONDICIONES DE PAGO" });
@@ -1114,7 +1123,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let refTouched=false, editingRef="";
-const APP_VERSION="2026.10.17-3";
+const APP_VERSION="2026.10.18-1";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
