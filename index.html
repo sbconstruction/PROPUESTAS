@@ -806,7 +806,9 @@ const G = {
 const TIPOS = [
   { id: "viv1", n: "Vivienda de 1 planta", d: "vivienda unifamiliar de una planta", ref: 120, h: [2, 6, 16], g: ["cimientos", "muros", "techo", "noEstructurales"] },
   { id: "viv2", n: "Vivienda de 2–3 plantas o dúplex", d: "vivienda de dos o tres plantas", ref: 250, h: [3, 10, 24], g: ["cimientos", "entrepisos", "muros", "techo", "noEstructurales"] },
-  { id: "local", n: "Local comercial u oficina", d: "local comercial", ref: 300, h: [3, 12, 32], g: ["cimientos", "techo", "diagonales", "otras"] },
+  { id: "local", n: "Local comercial de 1 planta", d: "local comercial de una planta", ref: 300, h: [3, 12, 32], g: ["cimientos", "techo", "diagonales", "otras"] },
+  { id: "local2", n: "Local comercial con 1 planta alta", d: "local comercial con una planta alta", ref: 600, h: [4, 15, 38], g: ["cimientos", "sistema", "entrepisos", "techo", "diagonales", "noEstructurales"] },
+  { id: "local3", n: "Local comercial con 2 plantas altas", d: "local comercial con dos plantas altas", ref: 900, h: [5, 18, 45], g: ["cimientos", "sistema", "entrepisos", "techo", "diagonales", "noEstructurales"] },
   { id: "galera", n: "Galera, bodega o nave industrial", d: "galera o nave industrial", ref: 600, h: [3, 12, 32], g: ["cimientos", "metalica", "diagonales", "cerramientos"] },
   { id: "parque", n: "Parque, plaza o área recreativa", d: "parque o área recreativa", ref: 1000, h: [3, 8, 20], g: ["terreno", "recreativas", "complementos"] },
   { id: "muro", n: "Muro de contención, tanque elevado o puente pequeño", d: "estructura (muro de contención, tanque o puente)", ref: 60, h: [3, 10, 20], g: ["terreno", "cuerpo", "drenaje"] },
@@ -1131,7 +1133,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.18-2";
+const APP_VERSION="2026.10.18-3";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
@@ -1342,7 +1344,7 @@ $("guardar").addEventListener("click",()=>{if(!last)return;if(!last.s.cliente){$
 function nombreArchivo(s,ext){
   const clean=v=>(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9]+/g,"");
   const f=(s.fecha||hoyISO()).replace(/-/g,"").slice(2);
-  const tipoCorto={viv1:"Vivienda",viv2:"Vivienda",local:"LocalComercial",galera:"Galera",parque:"Parque",muro:"Estructura",esen:"Edificacion",ed4:"Edificio",ed10:"Edificio",ed11:"Torre"}[s.tipo];
+  const tipoCorto={viv1:"Vivienda",viv2:"Vivienda",local:"LocalComercial",local2:"LocalComercial2P",local3:"LocalComercial3P",galera:"Galera",parque:"Parque",muro:"Estructura",esen:"Edificacion",ed4:"Edificio",ed10:"Edificio",ed11:"Torre"}[s.tipo];
   return [f,"Propuesta_SB_Inspeccion_PostSismo",clean(s.cliente)||"Cliente",tipoCorto,clean(s.lugar)].filter(Boolean).join("_")+"."+ext;
 }
 async function generar(kind){
