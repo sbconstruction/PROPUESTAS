@@ -939,7 +939,7 @@ function propuesta(s, q) {
   B.push({ t: "kv", rows: [
     ["Primer pago:", `50% del total (${money(q.p1)}) como abono inicial, al autorizar la ${n === 0 ? "inspección" : "evaluación"} y antes de la visita de campo.`],
     ["Segundo pago:", `50% restante (${money(q.p2)}) contra la entrega del informe técnico.`],
-    ["Forma de pago:", "Los pagos se realizan a la cuenta corriente del Banco General de SB Construction & Design Corp #04-02-96-861533-1."],
+    ["Forma de pago:", "Los pagos se realizan a la cuenta de ahorros del Banco General de SB Construction & Design Corp #04-02-96-861533-1."],
   ] });
 
   B.push({ t: "h", num: "06.", text: "EXCLUSIONES" });
@@ -1140,7 +1140,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.18-4";
+const APP_VERSION="2026.10.19-1";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
