@@ -269,7 +269,8 @@ footer a{color:var(--navy)}
         </div>
         <span class="hint">Solo ajusta el precio; no aparece en la propuesta.</span>
       </div>
-      <label class="check"><input type="checkbox" id="estim"> <span><b>Ofrecer Opción B:</b> inspección + estimación de daños y presupuesto de reparación</span></label>
+      <label class="check"><input type="checkbox" id="estim"> <span><b>Ofrecer Opción B:</b> inspección + estimación general de daños (global, basada en las fotos de la inspección)</span></label>
+      <label class="check"><input type="checkbox" id="presup"> <span><b>Ofrecer Opción C:</b> inspección + presupuesto detallado de reparación (materiales, mano de obra y actividades; es diseño, cuesta más)</span></label>
       <label class="check"><input type="checkbox" id="complejo"> <span>Obra de gran magnitud o complejidad técnica: +20% (sección X del reglamento)</span></label>
 
       <hr class="sep">
@@ -872,8 +873,14 @@ function horasRec(t, n, area, d) {
   const h1 = horasN1Area(area) * FACTOR_TIPO[t.id];
   return Math.max(1, q4(h1 * (t.h[n] / t.h[0]) * d));
 }
-// Estimación de daños y presupuesto de reparación: horas propias (a la tarifa mínima), menos en paquete porque aprovecha la misma visita
-const EST_FACTOR = 1.2, EST_DANO = { "1": 1, "1.15": 1.35, "1.3": 1.7 }, EST_PAQUETE = 0.65, EST_MIN_H = 1.5;
+// Opción B — estimación general de daños (global, a partir del registro fotográfico): horas propias, menos en paquete porque aprovecha la misma visita
+const EST_FACTOR = 0.9, EST_DANO = { "1": 1, "1.15": 1.35, "1.3": 1.7 }, EST_PAQUETE = 0.65, EST_MIN_H = 1;
+// Opción C — presupuesto detallado de reparación (trabajo de diseño): cómputos, materiales, mano de obra y actividades por partidas
+const PRES_FACTOR = 2.5, PRES_MIN_H = 3;
+function horasPresupuesto(t, n, area, d) {
+  const h = horasRec(t, 0, area, 1) * PRES_FACTOR * (EST_DANO[String(d)] || 1) * (n === 2 ? 0.7 : 1);
+  return Math.max(PRES_MIN_H, q4(h));
+}
 function horasEstimacion(t, n, area, d) {
   const h = horasRec(t, 0, area, 1) * EST_FACTOR * (EST_DANO[String(d)] || 1) * (n === 2 ? 0.6 : 1);
   const solo = Math.max(EST_MIN_H + 0.5, q4(h));
@@ -910,7 +917,14 @@ function cotizar(s) {
     const subB = r2(sub + est.v), itB = r2(subB * 0.07), totB = r2(subB + itB);
     OB = { sub: subB, itbms: itB, total: totB, p1: r2(totB / 2), p2: r2(totB - r2(totB / 2)) };
   }
-  return { t, n, area, rec, h, lines, sub, itbms, total, p1, p2, est, OB };
+  let pres = null, OC = null;
+  if (s.presup) {
+    const hp = horasPresupuesto(t, n, area, d);
+    pres = { h: hp, v: a5(hp * RATE) };
+    const subC = r2(sub + pres.v), itC = r2(subC * 0.07), totC = r2(subC + itC);
+    OC = { sub: subC, itbms: itC, total: totC, p1: r2(totC / 2), p2: r2(totC - r2(totC / 2)) };
+  }
+  return { t, n, area, rec, h, lines, sub, itbms, total, p1, p2, est, OB, pres, OC };
 }
 function fmtNum(v) { return Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }); }
 
@@ -963,12 +977,21 @@ function propuesta(s, q) {
      "Verificación estructural según el REP y dictamen sobre la condición de la edificación.",
      "Propuesta conceptual de reparación o reforzamiento con presupuesto estimado."]][n] });
   if (q.est) {
-    B.push({ t: "sub", text: `${LET[li++]}.  Estimación de Daños y Presupuesto de Reparación (solo Opción B)` });
+    B.push({ t: "sub", text: `${LET[li++]}.  Estimación General de Daños (solo Opción B)` });
     B.push({ t: "dash", items: [
-      "Levantamiento y cuantificación de cada daño: ubicación, tipo, dimensiones y registro fotográfico.",
-      "Cómputo de las cantidades de obra necesarias para la reparación (demoliciones, resanes, repellos, reposición de elementos, pintura y limpieza).",
-      "Precios unitarios de mercado de la región para materiales y mano de obra.",
-      "Presupuesto de reparación por partidas, con ITBMS, que el cliente puede usar para contratar la reparación o presentar ante terceros."] });
+      "Identificación y descripción de los daños observados, con base en el registro fotográfico terrestre y aéreo de la inspección.",
+      "Clasificación de los daños por tipo y por zona de la edificación.",
+      "Estimación global del costo aproximado de reparación, expresada como monto o rango de referencia.",
+      "Es una estimación general: no incluye cómputo de cantidades ni desglose de materiales, mano de obra o actividades."] });
+  }
+  if (q.pres) {
+    B.push({ t: "sub", text: `${LET[li++]}.  Presupuesto Detallado de Reparación (solo Opción C)` });
+    B.push({ t: "dash", items: [
+      "Levantamiento y medición de cada daño: ubicación, tipo y dimensiones.",
+      "Definición de las actividades de reparación (demoliciones, resanes, repellos, reposición de elementos, pintura y limpieza).",
+      "Cómputo de cantidades de obra, materiales y mano de obra por actividad.",
+      "Presupuesto de reparación por partidas con precios unitarios de la región e ITBMS, que el cliente puede usar para contratar la reparación o presentar ante terceros.",
+      "Este presupuesto corresponde a trabajo de diseño, por eso tiene un costo distinto al de la estimación general."] });
   }
   B.push({ t: "sub", text: `${LET[li++]}.  Información y Condiciones` });
   B.push({ t: "p", text: `${cli} facilitará el acceso a la edificación, incluida la cubierta y las áreas aledañas, los planos estructurales y arquitectónicos disponibles y la información sobre los daños reportados. ${n === 2 ? "Los ensayos son mayormente no destructivos; la extracción de núcleos deja perforaciones puntuales que se resanan con mortero de reparación." : "La inspección es visual y no destructiva; sus conclusiones se limitan a lo observable al momento de la visita."} Si se identifica daño moderado o severo, SB recomendará por escrito las medidas inmediatas y la evaluación complementaria que corresponda.` });
@@ -989,22 +1012,30 @@ function propuesta(s, q) {
   if (s.cil) incl.push("muestreo y ensayo de cilindros de concreto");
   if (s.refuerzo) incl.push("diseño de reforzamiento");
   const inclTxt = incl.length ? ". Incluye " + (incl.length > 1 ? incl.slice(0, -1).join(", ") + " y " + incl.at(-1) : incl[0]) : "";
-  if (q.est) {
-    B.push({ t: "p", text: `Se ofrecen dos opciones. ${cli} indica al aceptar la propuesta cuál contrata:` });
+  if (q.est || q.pres) {
+    const nOp = 1 + (q.est ? 1 : 0) + (q.pres ? 1 : 0);
+    B.push({ t: "p", text: `Se ofrecen ${nOp === 3 ? "tres" : "dos"} opciones. ${cli} indica al aceptar la propuesta cuál contrata:` });
     B.push({ t: "sub", text: "Opción A — Inspección" });
     B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)]], sub: money(q.sub), itbms: money(q.itbms), total: money(q.total) });
-    B.push({ t: "sub", text: "Opción B — Inspección + estimación de daños y presupuesto de reparación" });
-    B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)], [`Estimación de daños y presupuesto de reparación (precio en paquete)`, money(q.est.v)]], sub: money(q.OB.sub), itbms: money(q.OB.itbms), total: money(q.OB.total) });
-    B.push({ t: "p", text: `*  En la Opción B la estimación de daños aprovecha la misma visita de campo de la inspección, por eso cuesta menos que contratada por separado (${money(q.est.solo)} + ITBMS).`, before: true });
+    if (q.est) {
+      B.push({ t: "sub", text: "Opción B — Inspección + estimación general de daños" });
+      B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)], [`Estimación general de daños basada en el registro fotográfico (precio en paquete)`, money(q.est.v)]], sub: money(q.OB.sub), itbms: money(q.OB.itbms), total: money(q.OB.total) });
+      B.push({ t: "p", text: `*  En la Opción B la estimación aprovecha la misma visita de campo de la inspección, por eso cuesta menos que contratada por separado (${money(q.est.solo)} + ITBMS).`, before: true });
+    }
+    if (q.pres) {
+      B.push({ t: "sub", text: "Opción C — Inspección + presupuesto detallado de reparación" });
+      B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)], [`Presupuesto detallado de reparación: materiales, mano de obra y actividades por partidas (diseño)`, money(q.pres.v)]], sub: money(q.OC.sub), itbms: money(q.OC.itbms), total: money(q.OC.total) });
+    }
   } else {
     B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)]], sub: money(q.sub), itbms: money(q.itbms), total: money(q.total) });
   }
   B.push({ t: "p", text: `*  Los montos corresponden a una (1) edificación de hasta ${A} m². Edificaciones de área superior requerirán ajuste de honorarios previo acuerdo por escrito.`, before: true });
 
+  const OPS = [["A", q], ...(q.OB ? [["B", q.OB]] : []), ...(q.OC ? [["C", q.OC]] : [])];
   B.push({ t: "h", num: "05.", text: "CONDICIONES DE PAGO" });
   B.push({ t: "kv", rows: [
-    ["Primer pago:", q.OB ? `50% del total de la opción elegida como abono inicial, antes de la visita de campo: Opción A ${money(q.p1)} · Opción B ${money(q.OB.p1)}.` : `50% del total (${money(q.p1)}) como abono inicial, al autorizar la ${n === 0 ? "inspección" : "evaluación"} y antes de la visita de campo.`],
-    ["Segundo pago:", q.OB ? `50% restante contra la entrega del informe técnico${" "}(y del presupuesto de reparación en la Opción B): Opción A ${money(q.p2)} · Opción B ${money(q.OB.p2)}.` : `50% restante (${money(q.p2)}) contra la entrega del informe técnico.`],
+    ["Primer pago:", OPS.length > 1 ? `50% del total de la opción elegida como abono inicial, antes de la visita de campo: ${OPS.map(([L, o]) => `Opción ${L} ${money(o.p1)}`).join(" · ")}.` : `50% del total (${money(q.p1)}) como abono inicial, al autorizar la ${n === 0 ? "inspección" : "evaluación"} y antes de la visita de campo.`],
+    ["Segundo pago:", OPS.length > 1 ? `50% restante contra la entrega del informe técnico${q.est && q.pres ? " (con la estimación general en la Opción B o el presupuesto detallado en la Opción C)" : q.est ? " (con la estimación general en la Opción B)" : " (con el presupuesto detallado en la Opción C)"}: ${OPS.map(([L, o]) => `Opción ${L} ${money(o.p2)}`).join(" · ")}.` : `50% restante (${money(q.p2)}) contra la entrega del informe técnico.`],
     ["Forma de pago:", "Los pagos se realizan a la cuenta de ahorros del Banco General de SB Construction & Design Corp #04-02-96-861533-1."],
   ] });
 
@@ -1018,12 +1049,14 @@ function propuesta(s, q) {
     "Evaluación de instalaciones eléctricas, sanitarias, mecánicas, equipos y acabados.",
     `Inspección de áreas no accesibles o que requieran remover acabados, mercancía, estanterías o equipos, salvo que ${cli} coordine el acceso.`,
     "Permisos, tasas y trámites ante entidades gubernamentales.",
-    ...(q.est ? ["En la Opción A, la estimación de daños y el presupuesto de reparación (incluidos solo en la Opción B).",
-      "La determinación de montos a reconocer o indemnizar por terceros, así como la representación de " + cli + " en reclamos o su comparecencia ante terceros."] : [])] });
+    ...(q.est || q.pres ? [`En la Opción A, ${q.est && q.pres ? "la estimación general de daños (Opción B) y el presupuesto detallado de reparación (Opción C)" : q.est ? "la estimación general de daños (incluida solo en la Opción B)" : "el presupuesto detallado de reparación (incluido solo en la Opción C)"}.`] : []),
+    ...(q.est ? ["En la Opción B, el cómputo de cantidades y el desglose de materiales, mano de obra y actividades; ese presupuesto detallado es trabajo de diseño" + (q.pres ? " y corresponde a la Opción C." : " y se cotiza por separado.")] : []),
+    ...(q.pres ? ["En la Opción C, planos de reparación, trámites de permisos y supervisión de las obras."] : []),
+    ...(q.est || q.pres ? ["La determinación de montos a reconocer o indemnizar por terceros, así como la representación de " + cli + " en reclamos o su comparecencia ante terceros."] : [])] });
 
   B.push({ t: "h", num: "07.", text: "VIGENCIA DE LA PROPUESTA" });
   B.push({ t: "p", text: "La presente propuesta tiene una vigencia de treinta (30) días calendario a partir de la fecha de emisión. Transcurrido dicho plazo sin confirmación por escrito, los términos y condiciones podrán ser revisados y ajustados según las condiciones de mercado vigentes." });
-  if (q.est) B.push({ t: "p", text: "Opción aceptada por el cliente:     Opción A  ________     Opción B  ________", before: true });
+  if (OPS.length > 1) B.push({ t: "p", text: "Opción aceptada por el cliente:     " + OPS.map(([L]) => `Opción ${L}  ________`).join("     "), before: true });
   B.push({ t: "sign", cli });
   return B;
 }
@@ -1209,7 +1242,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.22-1";
+const APP_VERSION="2026.10.22-2";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
@@ -1217,7 +1250,7 @@ function estado(){
   const t=getT();
   return {tipo:t.id,nivel:+document.querySelector('input[name=nivel]:checked').value,dano:(v=>v==="nd"?1:parseFloat(v))(document.querySelector('input[name=dano]:checked').value),danoND:document.querySelector('input[name=dano]:checked').value==="nd",acceso:parseFloat(document.querySelector('input[name=acceso]:checked').value)||1,
     area:numv("area")||t.ref,cliente:$("cliente").value.trim(),desc:$("desc").value.trim(),lugar:$("lugar").value.trim(),ubic:$("ubic").value.trim(),
-    fecha:$("fecha").value,ref:$("ref").value.trim(),complejo:$("complejo").checked,estim:$("estim").checked,
+    fecha:$("fecha").value,ref:$("ref").value.trim(),complejo:$("complejo").checked,estim:$("estim").checked,presup:$("presup").checked,
     km:numv("km"),tkm:numv("tkm"),alimD:numv("alimD"),alimR:numv("alimR"),aloj:numv("aloj"),topoC:numv("topoC"),topoO:numv("topoO"),cil:numv("cil"),refuerzo:numv("refuerzo"),
     horasMan:optv("horasMan"),montoMan:optv("montoMan")};
 }
@@ -1256,8 +1289,9 @@ function calc(){
   s.ref=$("ref").value;
   $("desg").innerHTML=q.lines.map(l=>`<tr><td>${esc(l.desc)}${l.sub?`<small>${esc(l.sub)}</small>`:""}</td><td class="n">${money(l.v)}</td></tr>`).join("")+
     `<tr class="sub"><td>Subtotal</td><td class="n">${money(q.sub)}</td></tr><tr><td>ITBMS 7%</td><td class="n">${money(q.itbms)}</td></tr><tr><td>Pagos 50% / 50%</td><td class="n" style="white-space:normal">${money(q.p1)}<br>${money(q.p2)}</td></tr>`+
-    (q.est?`<tr class="sub"><td>Opción B: + estimación de daños<small>${q.est.h} h en paquete (por separado ${q.est.hSolo} h = ${money(q.est.solo)})</small></td><td class="n">${money(q.est.v)}</td></tr><tr class="sub"><td>Total Opción B con ITBMS<small>Pagos ${money(q.OB.p1)} + ${money(q.OB.p2)}</small></td><td class="n">${money(q.OB.total)}</td></tr>`:"");
-  $("tot").textContent=money(q.total);$("totLbl").textContent=q.est?"Opción A · Total con ITBMS":"Total con ITBMS";
+    (q.est?`<tr class="sub"><td>Opción B: + estimación general<small>${q.est.h} h en paquete (por separado ${q.est.hSolo} h = ${money(q.est.solo)})</small></td><td class="n">${money(q.est.v)}</td></tr><tr class="sub"><td>Total Opción B con ITBMS<small>Pagos ${money(q.OB.p1)} + ${money(q.OB.p2)}</small></td><td class="n">${money(q.OB.total)}</td></tr>`:"")+
+    (q.pres?`<tr class="sub"><td>Opción C: + presupuesto detallado<small>${q.pres.h} h de diseño × ${money(120)}</small></td><td class="n">${money(q.pres.v)}</td></tr><tr class="sub"><td>Total Opción C con ITBMS<small>Pagos ${money(q.OC.p1)} + ${money(q.OC.p2)}</small></td><td class="n">${money(q.OC.total)}</td></tr>`:"");
+  $("tot").textContent=money(q.total);$("totLbl").textContent=(q.est||q.pres)?"Opción A · Total con ITBMS":"Total con ITBMS";
   const falt=[!s.cliente&&"nombre del cliente",!s.lugar&&"lugar",!s.ubic&&"ubicación completa",!s.fecha&&"fecha"].filter(Boolean);
   $("faltan").hidden=!falt.length;$("faltan").textContent=falt.length?"Falta: "+falt.join(", ")+".":"";
   const B=propuesta(s,q);renderPaper(B,s);
@@ -1297,6 +1331,7 @@ function seqInicio(){try{return parseInt(localStorage.getItem("sbseq")||"1",10)|
 function siguienteNumero(){let mx=0;for(const r of REG){const n=numDe(r.ref);if(n>mx)mx=n}return Math.max(mx+1,seqInicio())}
 function numeroAsignado(){return editingRef&&REG.some(r=>r.ref===editingRef)?numDe(editingRef):siguienteNumero()}
 const r2m=v=>Math.round((+v||0)*100)/100;
+function totalOp(r,o){return o==="B"&&r.totalB?r.totalB:o==="C"&&r.totalC?r.totalC:r.totalA}
 function saldoDe(r){return r.fCanc?0:Math.max(0,r2m(r.total-(+r.abono||0)))}
 function registrar(s,q){
   const ref=s.ref||`PE-INS-${iniciales(s.cliente||"XX")}-${pad3(numeroAsignado())}`;
@@ -1304,9 +1339,9 @@ function registrar(s,q){
   // Si se cambiaron las iniciales de una propuesta ya guardada, se renombra (mismo número)
   if(editingRef&&editingRef!==ref){const old=REG.find(x=>x.ref===editingRef);if(old&&!REG.some(x=>x.ref===ref))old.ref=ref}
   let r=REG.find(x=>x.ref===ref);
-  const base={ref,cliente:s.cliente,lugar:s.lugar,tipoN:q.t.n,nivel:q.n+1,area:q.area,fechaProp:s.fecha,totalA:q.total,totalB:q.OB?q.OB.total:null,s,actualizado:now};
-  base.total=(r&&r.opcion==="B"&&base.totalB)?base.totalB:base.totalA;
-  if(!base.totalB&&r)r.opcion="A";
+  const base={ref,cliente:s.cliente,lugar:s.lugar,tipoN:q.t.n,nivel:q.n+1,area:q.area,fechaProp:s.fecha,totalA:q.total,totalB:q.OB?q.OB.total:null,totalC:q.OC?q.OC.total:null,s,actualizado:now};
+  if(r&&((r.opcion==="B"&&!base.totalB)||(r.opcion==="C"&&!base.totalC)))r.opcion="A";
+  base.total=totalOp(base,r?r.opcion:"A");
   if(r)Object.assign(r,base);else{r={...base,id:nuevoId(),estado:"Pendiente",fInsp:"",nInsp:"",abono:"",fCanc:"",creado:now};REG.unshift(r)}
   editingRef=ref;
   regSave();renderReg();calc();
@@ -1328,7 +1363,7 @@ function renderReg(){
   $("reg").innerHTML=hd+rows.map(r=>{const i=esc(r.ref);const sd=saldoDe(r);return `<div class="rr" data-ref="${i}">
     <div><span class="cl">Nº propuesta</span><span class="ref">${i}</span><small>${esc(fechaCorta(r.fechaProp))}</small></div>
     <div class="who"><span class="cl">Cliente</span><b>${esc(r.cliente||"Sin nombre")}</b><small>${esc([r.tipoN,r.lugar].filter(Boolean).join(" · "))} · Nivel ${r.nivel||1}</small></div>
-    <div><span class="cl">Estado</span><select data-k="estado" class="st-${esc(r.estado)}" aria-label="Estado de ${i}">${["Pendiente","Aceptada","Rechazada"].map(o=>`<option${o===r.estado?" selected":""}>${o}</option>`).join("")}</select>${r.totalB?`<select data-k="opcion" aria-label="Opción de ${i}" style="margin-top:4px"><option value="A"${r.opcion!=="B"?" selected":""}>Opción A</option><option value="B"${r.opcion==="B"?" selected":""}>Opción B (+ estimación)</option></select>`:""}</div>
+    <div><span class="cl">Estado</span><select data-k="estado" class="st-${esc(r.estado)}" aria-label="Estado de ${i}">${["Pendiente","Aceptada","Rechazada"].map(o=>`<option${o===r.estado?" selected":""}>${o}</option>`).join("")}</select>${(r.totalB||r.totalC)?`<select data-k="opcion" aria-label="Opción de ${i}" style="margin-top:4px"><option value="A"${r.opcion!=="B"&&r.opcion!=="C"?" selected":""}>Opción A</option>${r.totalB?`<option value="B"${r.opcion==="B"?" selected":""}>Opción B (+ estimación)</option>`:""}${r.totalC?`<option value="C"${r.opcion==="C"?" selected":""}>Opción C (+ presupuesto)</option>`:""}</select>`:""}</div>
     <div><span class="cl">Fecha inspección</span><input type="date" data-k="fInsp" value="${esc(r.fInsp||"")}" aria-label="Fecha de inspección de ${i}"></div>
     <div><span class="cl">Nº inspección</span><input type="text" data-k="nInsp" value="${esc(r.nInsp||"")}" placeholder="Nº" aria-label="Número de inspección de ${i}"></div>
     <div><span class="cl">Total</span><span class="m">${money(r.total)}</span></div>
@@ -1343,7 +1378,7 @@ $("reg").addEventListener("change",e=>{
   const row=e.target.closest(".rr[data-ref]"),k=e.target.dataset.k;if(!row||!k)return;
   const r=REG.find(x=>x.ref===row.dataset.ref);if(!r)return;
   let v=e.target.type==="checkbox"?e.target.checked:e.target.value;if(k==="fEntrega"&&v)r.impreso=true;if(k==="abono")v=v===""?"":r2m(Math.max(0,parseFloat(v)||0));
-  r[k]=v;if(k==="opcion"&&r.totalA!=null)r.total=v==="B"&&r.totalB?r.totalB:r.totalA;r.actualizado=new Date().toISOString();regSave();renderReg();
+  r[k]=v;if(k==="opcion"&&r.totalA!=null)r.total=totalOp(r,v);r.actualizado=new Date().toISOString();regSave();renderReg();
 });
 $("reg").addEventListener("click",e=>{
   const b=e.target.closest("button[data-a]");if(!b)return;
@@ -1391,7 +1426,7 @@ function csvCell(v){v=v==null?"":String(v);return /[",\n;]/.test(v)?`"${v.replac
 $("regCsv").addEventListener("click",async()=>{
   if(!REG.length){$("regMsg").textContent="No hay propuestas para exportar.";return}
   const head=["Nº propuesta","Fecha propuesta","Cliente","Lugar","Tipo de estructura","Nivel","Estado","Fecha inspección","Nº inspección","Total (B/.)","Abono (B/.)","Saldo (B/.)","Fecha cancelación","Informe adjunto","Opción","Informe impreso","Fecha de entrega del informe"];
-  const lines=[head,...REG.map(r=>[r.ref,fechaCorta(r.fechaProp),r.cliente,r.lugar,r.tipoN,r.nivel,r.estado,fechaCorta(r.fInsp),r.nInsp,r2m(r.total).toFixed(2),r.abono===""?"":r2m(r.abono).toFixed(2),saldoDe(r).toFixed(2),fechaCorta(r.fCanc),r.informe?r.informe.name:"No",r.totalB?(r.opcion==="B"?"B (con estimación)":"A"):"A",r.impreso?"Sí":"No",fechaCorta(r.fEntrega)])].map(a=>a.map(csvCell).join(","));
+  const lines=[head,...REG.map(r=>[r.ref,fechaCorta(r.fechaProp),r.cliente,r.lugar,r.tipoN,r.nivel,r.estado,fechaCorta(r.fInsp),r.nInsp,r2m(r.total).toFixed(2),r.abono===""?"":r2m(r.abono).toFixed(2),saldoDe(r).toFixed(2),fechaCorta(r.fCanc),r.informe?r.informe.name:"No",r.opcion==="B"&&r.totalB?"B (estimación general)":r.opcion==="C"&&r.totalC?"C (presupuesto detallado)":"A",r.impreso?"Sí":"No",fechaCorta(r.fEntrega)])].map(a=>a.map(csvCell).join(","));
   const blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv"});
   try{$("regMsg").textContent=await entregar(blob,`Control_Propuestas_SB_${hoyISO().replace(/-/g,"").slice(2)}.csv`)}catch(e){$("regMsg").textContent=msgError(e)}
 });
@@ -1424,7 +1459,7 @@ function cargarEstado(d){
   const nv=$("n"+((d.nivel|0)+1));if(nv)nv.checked=true;
   const dm=d.danoND||d.dano==null?"d0":{"1":"d1","1.15":"d2","1.3":"d3"}[String(d.dano)];if(dm)$(dm).checked=true;
   const am={"1":"a1","1.15":"a2","1.3":"a3"}[String(d.acceso||1)];if(am)$(am).checked=true;
-  $("complejo").checked=!!d.complejo;$("estim").checked=!!d.estim;
+  $("complejo").checked=!!d.complejo;$("estim").checked=!!d.estim;$("presup").checked=!!d.presup;
 }
 function mostrarTab(t){
   const c=t==="control";$("tab-nueva").hidden=c;$("tab-control").hidden=!c;
@@ -1454,7 +1489,7 @@ $("guardar").addEventListener("click",()=>{if(!last)return;if(!last.s.cliente){$
     const nv=$("n"+((d.nivel|0)+1));if(nv)nv.checked=true;
     const dm=d.danoND||d.dano==null?"d0":{"1":"d1","1.15":"d2","1.3":"d3"}[String(d.dano)];if(dm)$(dm).checked=true;
   const am={"1":"a1","1.15":"a2","1.3":"a3"}[String(d.acceso||1)];if(am)$(am).checked=true;
-    $("complejo").checked=!!d.complejo;$("estim").checked=!!d.estim;iniTouched=!!d.iniTouched;editingRef=d.editingRef||"";if(d.extrasOpen)$("extras").open=true;
+    $("complejo").checked=!!d.complejo;$("estim").checked=!!d.estim;$("presup").checked=!!d.presup;iniTouched=!!d.iniTouched;editingRef=d.editingRef||"";if(d.extrasOpen)$("extras").open=true;
   }
   calc();renderReg();
   let tb="nueva";try{tb=location.hash==="#control"?"control":(localStorage.getItem("sbtab")||"nueva")}catch(e){}
