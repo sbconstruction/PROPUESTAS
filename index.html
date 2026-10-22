@@ -161,6 +161,11 @@ td small{display:block;color:var(--muted);font-size:12px}
 .rr .inf button{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);padding:4px 9px;cursor:pointer}
 .rr .inf button.pri{border-color:var(--orange);background:var(--orange-soft)}
 .rr .inf button.armed{background:#c2410c;border-color:#c2410c;color:#fff}
+.rr .inf .entr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-left:auto}
+.rr .inf .ck{display:inline-flex;align-items:center;gap:6px;color:var(--fg);font-size:13px;font-weight:400}
+.rr .inf .ck input[type=checkbox]{accent-color:var(--orange);width:auto;margin:0}
+.rr .inf .ck input[type=date]{width:auto;padding:4px 6px;font-size:13px}
+@media (max-width:900px){.rr .inf .entr{margin-left:0}}
 .rr .inf .pdfi{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:#c2410c;border-radius:4px;padding:1px 5px}
 .empty{padding:28px 12px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
 @media (max-width:900px){
@@ -339,7 +344,7 @@ footer a{color:var(--navy)}
       </div>
       <div class="tools">
         <input type="search" id="regQ" placeholder="Buscar cliente o número" aria-label="Buscar">
-        <select id="regF" aria-label="Filtrar por estado"><option value="">Todas</option><option>Pendiente</option><option>Aceptada</option><option>Rechazada</option></select>
+        <select id="regF" aria-label="Filtrar por estado"><option value="">Todas</option><option>Pendiente</option><option>Aceptada</option><option>Rechazada</option><option value="porEntregar">Informe por entregar</option><option value="entregado">Informe entregado</option></select>
         <span class="sp"></span>
         <label class="seqbox" for="seqNext">Próximo nº <input type="number" id="seqNext" min="1" step="1"></label>
         <button type="button" class="btn3" id="regCsv">Exportar a Excel</button>
@@ -1204,7 +1209,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.21-3";
+const APP_VERSION="2026.10.21-4";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
@@ -1316,7 +1321,7 @@ function renderReg(){
   $("kC").textContent=money(ac.reduce((a,r)=>a+(r.fCanc?r.total:(+r.abono||0)),0));
   $("kP").textContent=money(ac.reduce((a,r)=>a+saldoDe(r),0));
   const q=$("regQ").value.trim().toLowerCase(),f=$("regF").value;
-  const rows=REG.filter(r=>(!f||r.estado===f)&&(!q||(r.cliente||"").toLowerCase().includes(q)||(r.ref||"").toLowerCase().includes(q)||(r.nInsp||"").toLowerCase().includes(q)));
+  const rows=REG.filter(r=>(!f||(f==="porEntregar"?r.estado==="Aceptada"&&!r.fEntrega:f==="entregado"?!!r.fEntrega:r.estado===f))&&(!q||(r.cliente||"").toLowerCase().includes(q)||(r.ref||"").toLowerCase().includes(q)||(r.nInsp||"").toLowerCase().includes(q)));
   if(!REG.length){$("reg").innerHTML=`<div class="empty">Todavía no hay propuestas en el control.<br>Descarga una propuesta en Word o PDF, o toca <b>Guardar en el control</b>, y aparecerá aquí.</div>`;return}
   if(!rows.length){$("reg").innerHTML=`<div class="empty">Ninguna propuesta coincide con la búsqueda.</div>`;return}
   const hd=`<div class="rr hd"><div>Nº propuesta</div><div>Cliente</div><div>Estado</div><div>Fecha inspección</div><div>Nº inspección</div><div>Total</div><div>Abono</div><div>Saldo</div><div>Fecha cancelación</div><div></div></div>`;
@@ -1331,13 +1336,13 @@ function renderReg(){
     <div><span class="cl">Saldo</span>${r.fCanc?`<span class="chip">Pagado</span>`:`<span class="m">${money(sd)}</span>`}</div>
     <div><span class="cl">Fecha cancelación</span><input type="date" data-k="fCanc" value="${esc(r.fCanc||"")}" aria-label="Fecha de cancelación de ${i}"></div>
     <div class="acts span2"><button type="button" data-a="abrir">Abrir</button><button type="button" class="del" data-a="del">Eliminar</button></div>
-    <div class="inf">${r.informe?`<span class="pdfi">PDF</span><span>Informe: <b>${esc(r.informe.name)}</b> · ${tam(r.informe.size)} · ${esc(fechaCorta(r.informe.fecha))}</span><button type="button" class="pri" data-a="verinf">Ver / Enviar</button><button type="button" data-a="adj">Cambiar</button><button type="button" data-a="quitinf">Quitar</button>`:`<span>Informe técnico: sin adjuntar</span><button type="button" class="pri" data-a="adj">Adjuntar informe (PDF)</button>`}</div>
+    <div class="inf">${r.informe?`<span class="pdfi">PDF</span><span>Informe: <b>${esc(r.informe.name)}</b> · ${tam(r.informe.size)} · ${esc(fechaCorta(r.informe.fecha))}</span><button type="button" class="pri" data-a="verinf">Ver / Enviar</button><button type="button" data-a="adj">Cambiar</button><button type="button" data-a="quitinf">Quitar</button>`:`<span>Informe técnico: sin adjuntar</span><button type="button" class="pri" data-a="adj">Adjuntar informe (PDF)</button>`}<span class="entr"><label class="ck"><input type="checkbox" data-k="impreso"${r.impreso?" checked":""}> Impreso</label><label class="ck">Entregado el <input type="date" data-k="fEntrega" value="${esc(r.fEntrega||"")}" aria-label="Fecha de entrega del informe de ${i}"></label>${r.fEntrega?`<span class="chip">Entregado</span>`:""}</span></div>
   </div>`}).join("");
 }
 $("reg").addEventListener("change",e=>{
   const row=e.target.closest(".rr[data-ref]"),k=e.target.dataset.k;if(!row||!k)return;
   const r=REG.find(x=>x.ref===row.dataset.ref);if(!r)return;
-  let v=e.target.value;if(k==="abono")v=v===""?"":r2m(Math.max(0,parseFloat(v)||0));
+  let v=e.target.type==="checkbox"?e.target.checked:e.target.value;if(k==="fEntrega"&&v)r.impreso=true;if(k==="abono")v=v===""?"":r2m(Math.max(0,parseFloat(v)||0));
   r[k]=v;if(k==="opcion"&&r.totalA!=null)r.total=v==="B"&&r.totalB?r.totalB:r.totalA;r.actualizado=new Date().toISOString();regSave();renderReg();
 });
 $("reg").addEventListener("click",e=>{
@@ -1385,8 +1390,8 @@ $("seqNext").addEventListener("change",()=>{
 function csvCell(v){v=v==null?"":String(v);return /[",\n;]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}
 $("regCsv").addEventListener("click",async()=>{
   if(!REG.length){$("regMsg").textContent="No hay propuestas para exportar.";return}
-  const head=["Nº propuesta","Fecha propuesta","Cliente","Lugar","Tipo de estructura","Nivel","Estado","Fecha inspección","Nº inspección","Total (B/.)","Abono (B/.)","Saldo (B/.)","Fecha cancelación","Informe adjunto","Opción"];
-  const lines=[head,...REG.map(r=>[r.ref,fechaCorta(r.fechaProp),r.cliente,r.lugar,r.tipoN,r.nivel,r.estado,fechaCorta(r.fInsp),r.nInsp,r2m(r.total).toFixed(2),r.abono===""?"":r2m(r.abono).toFixed(2),saldoDe(r).toFixed(2),fechaCorta(r.fCanc),r.informe?r.informe.name:"No",r.totalB?(r.opcion==="B"?"B (con estimación)":"A"):"A"])].map(a=>a.map(csvCell).join(","));
+  const head=["Nº propuesta","Fecha propuesta","Cliente","Lugar","Tipo de estructura","Nivel","Estado","Fecha inspección","Nº inspección","Total (B/.)","Abono (B/.)","Saldo (B/.)","Fecha cancelación","Informe adjunto","Opción","Informe impreso","Fecha de entrega del informe"];
+  const lines=[head,...REG.map(r=>[r.ref,fechaCorta(r.fechaProp),r.cliente,r.lugar,r.tipoN,r.nivel,r.estado,fechaCorta(r.fInsp),r.nInsp,r2m(r.total).toFixed(2),r.abono===""?"":r2m(r.abono).toFixed(2),saldoDe(r).toFixed(2),fechaCorta(r.fCanc),r.informe?r.informe.name:"No",r.totalB?(r.opcion==="B"?"B (con estimación)":"A"):"A",r.impreso?"Sí":"No",fechaCorta(r.fEntrega)])].map(a=>a.map(csvCell).join(","));
   const blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv"});
   try{$("regMsg").textContent=await entregar(blob,`Control_Propuestas_SB_${hoyISO().replace(/-/g,"").slice(2)}.csv`)}catch(e){$("regMsg").textContent=msgError(e)}
 });
