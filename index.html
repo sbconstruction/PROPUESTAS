@@ -269,7 +269,7 @@ footer a{color:var(--navy)}
         </div>
         <span class="hint">Solo ajusta el precio; no aparece en la propuesta.</span>
       </div>
-      <label class="check"><input type="checkbox" id="estim"> <span><b>Ofrecer Opción B:</b> inspección + estimación de daños para la aseguradora</span></label>
+      <label class="check"><input type="checkbox" id="estim"> <span><b>Ofrecer Opción B:</b> inspección + estimación de daños y presupuesto de reparación</span></label>
       <label class="check"><input type="checkbox" id="complejo"> <span>Obra de gran magnitud o complejidad técnica: +20% (sección X del reglamento)</span></label>
 
       <hr class="sep">
@@ -872,7 +872,7 @@ function horasRec(t, n, area, d) {
   const h1 = horasN1Area(area) * FACTOR_TIPO[t.id];
   return Math.max(1, q4(h1 * (t.h[n] / t.h[0]) * d));
 }
-// Estimación de daños para aseguradora: horas propias (a la tarifa mínima), menos en paquete porque aprovecha la misma visita
+// Estimación de daños y presupuesto de reparación: horas propias (a la tarifa mínima), menos en paquete porque aprovecha la misma visita
 const EST_FACTOR = 1.2, EST_DANO = { "1": 1, "1.15": 1.35, "1.3": 1.7 }, EST_PAQUETE = 0.65, EST_MIN_H = 1.5;
 function horasEstimacion(t, n, area, d) {
   const h = horasRec(t, 0, area, 1) * EST_FACTOR * (EST_DANO[String(d)] || 1) * (n === 2 ? 0.6 : 1);
@@ -963,12 +963,12 @@ function propuesta(s, q) {
      "Verificación estructural según el REP y dictamen sobre la condición de la edificación.",
      "Propuesta conceptual de reparación o reforzamiento con presupuesto estimado."]][n] });
   if (q.est) {
-    B.push({ t: "sub", text: `${LET[li++]}.  Estimación de Daños para la Aseguradora (solo Opción B)` });
+    B.push({ t: "sub", text: `${LET[li++]}.  Estimación de Daños y Presupuesto de Reparación (solo Opción B)` });
     B.push({ t: "dash", items: [
       "Levantamiento y cuantificación de cada daño: ubicación, tipo, dimensiones y registro fotográfico.",
       "Cómputo de las cantidades de obra necesarias para la reparación (demoliciones, resanes, repellos, reposición de elementos, pintura y limpieza).",
       "Precios unitarios de mercado de la región para materiales y mano de obra.",
-      "Presupuesto de reparación por partidas, con ITBMS, en un formato que se adjunta al reclamo ante la aseguradora."] });
+      "Presupuesto de reparación por partidas, con ITBMS, que el cliente puede usar para contratar la reparación o presentar ante terceros."] });
   }
   B.push({ t: "sub", text: `${LET[li++]}.  Información y Condiciones` });
   B.push({ t: "p", text: `${cli} facilitará el acceso a la edificación, incluida la cubierta y las áreas aledañas, los planos estructurales y arquitectónicos disponibles y la información sobre los daños reportados. ${n === 2 ? "Los ensayos son mayormente no destructivos; la extracción de núcleos deja perforaciones puntuales que se resanan con mortero de reparación." : "La inspección es visual y no destructiva; sus conclusiones se limitan a lo observable al momento de la visita."} Si se identifica daño moderado o severo, SB recomendará por escrito las medidas inmediatas y la evaluación complementaria que corresponda.` });
@@ -993,8 +993,8 @@ function propuesta(s, q) {
     B.push({ t: "p", text: `Se ofrecen dos opciones. ${cli} indica al aceptar la propuesta cuál contrata:` });
     B.push({ t: "sub", text: "Opción A — Inspección" });
     B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)]], sub: money(q.sub), itbms: money(q.itbms), total: money(q.total) });
-    B.push({ t: "sub", text: "Opción B — Inspección + estimación de daños para la aseguradora" });
-    B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)], [`Estimación de daños y presupuesto de reparación para la aseguradora (precio en paquete)`, money(q.est.v)]], sub: money(q.OB.sub), itbms: money(q.OB.itbms), total: money(q.OB.total) });
+    B.push({ t: "sub", text: "Opción B — Inspección + estimación de daños y presupuesto de reparación" });
+    B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)], [`Estimación de daños y presupuesto de reparación (precio en paquete)`, money(q.est.v)]], sub: money(q.OB.sub), itbms: money(q.OB.itbms), total: money(q.OB.total) });
     B.push({ t: "p", text: `*  En la Opción B la estimación de daños aprovecha la misma visita de campo de la inspección, por eso cuesta menos que contratada por separado (${money(q.est.solo)} + ITBMS).`, before: true });
   } else {
     B.push({ t: "fees", lines: [[q.lines[0].desc + inclTxt, money(q.sub)]], sub: money(q.sub), itbms: money(q.itbms), total: money(q.total) });
@@ -1019,7 +1019,7 @@ function propuesta(s, q) {
     `Inspección de áreas no accesibles o que requieran remover acabados, mercancía, estanterías o equipos, salvo que ${cli} coordine el acceso.`,
     "Permisos, tasas y trámites ante entidades gubernamentales.",
     ...(q.est ? ["En la Opción A, la estimación de daños y el presupuesto de reparación (incluidos solo en la Opción B).",
-      "La determinación del monto a indemnizar, que corresponde a la aseguradora y su ajustador, así como la representación de " + cli + " en el reclamo o su comparecencia ante terceros."] : [])] });
+      "La determinación de montos a reconocer o indemnizar por terceros, así como la representación de " + cli + " en reclamos o su comparecencia ante terceros."] : [])] });
 
   B.push({ t: "h", num: "07.", text: "VIGENCIA DE LA PROPUESTA" });
   B.push({ t: "p", text: "La presente propuesta tiene una vigencia de treinta (30) días calendario a partir de la fecha de emisión. Transcurrido dicho plazo sin confirmación por escrito, los términos y condiciones podrán ser revisados y ajustados según las condiciones de mercado vigentes." });
@@ -1209,7 +1209,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.21-4";
+const APP_VERSION="2026.10.22-1";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
