@@ -128,9 +128,10 @@ td small{display:block;color:var(--muted);font-size:12px}
 .seqbox{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
 .seqbox input{width:5.5em;font:inherit;font-family:var(--f-mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
 /* Control de propuestas */
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 @media (max-width:480px){.tabs button{font-size:14px;padding:10px 9px}}
-@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi.wide{grid-column:span 2}}
+.kpi small{font-size:11px;color:var(--muted)}
 .kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg);display:grid;gap:2px;min-width:0}
 .kpi span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .kpi strong{font-family:var(--f-mono);font-size:clamp(17px,2.4vw,22px);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
@@ -340,8 +341,9 @@ footer a{color:var(--navy)}
       <div class="kpis">
         <div class="kpi"><span>Propuestas</span><strong id="kN">0</strong></div>
         <div class="kpi"><span>Aceptadas</span><strong id="kA">0</strong></div>
-        <div class="kpi"><span>Cobrado</span><strong id="kC">B/. 0.00</strong></div>
-        <div class="kpi warn"><span>Por cobrar</span><strong id="kP">B/. 0.00</strong></div>
+        <div class="kpi wide"><span>Total aceptado</span><strong id="kT">B/. 0.00</strong><small>Suma de las propuestas aceptadas</small></div>
+        <div class="kpi"><span>Cobrado</span><strong id="kC">B/. 0.00</strong><small>Abonos y pagos completos</small></div>
+        <div class="kpi warn"><span>Saldo por cobrar</span><strong id="kP">B/. 0.00</strong><small>Total aceptado − cobrado</small></div>
       </div>
       <div class="tools">
         <input type="search" id="regQ" placeholder="Buscar cliente o número" aria-label="Buscar">
@@ -1242,7 +1244,7 @@ const tipoVal=()=>{const c=document.querySelector('input[name=tipo]:checked');re
 const setTipo=v=>{const r=$("t_"+v);if(r)r.checked=true};
 const getT=()=>TIPOS.find(x=>x.id===tipoVal());
 let iniTouched=false, editingRef="";
-const APP_VERSION="2026.10.22-2";
+const APP_VERSION="2026.10.22-3";
 
 function hoyISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function iniciales(n){const w=n.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().match(/[A-Z0-9]+/g)||[];return (w.length>1?w[0][0]+w[1][0]:(w[0]||"XX").slice(0,2)).padEnd(2,"X")}
@@ -1353,7 +1355,8 @@ function renderReg(){
   if(document.activeElement!==$("seqNext"))$("seqNext").value=siguienteNumero();
   const ac=REG.filter(r=>r.estado==="Aceptada");
   $("kN").textContent=REG.length;$("kA").textContent=ac.length;
-  $("kC").textContent=money(ac.reduce((a,r)=>a+(r.fCanc?r.total:(+r.abono||0)),0));
+  $("kT").textContent=money(ac.reduce((a,r)=>a+r2m(r.total),0));
+  $("kC").textContent=money(ac.reduce((a,r)=>a+(r.fCanc?r2m(r.total):Math.min(r2m(r.total),+r.abono||0)),0));
   $("kP").textContent=money(ac.reduce((a,r)=>a+saldoDe(r),0));
   const q=$("regQ").value.trim().toLowerCase(),f=$("regF").value;
   const rows=REG.filter(r=>(!f||(f==="porEntregar"?r.estado==="Aceptada"&&!r.fEntrega:f==="entregado"?!!r.fEntrega:r.estado===f))&&(!q||(r.cliente||"").toLowerCase().includes(q)||(r.ref||"").toLowerCase().includes(q)||(r.nInsp||"").toLowerCase().includes(q)));
